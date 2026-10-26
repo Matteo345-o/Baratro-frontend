@@ -1,4 +1,4 @@
-// src/components/Hand.tsx (o C:\Users\PrimavesiMatteo\Baratro-frontend\hand.tsx)
+
 import { useEffect, useRef, useState } from 'react';
 import { Card } from './src/game/logic';
 import { PlayingCard } from './src/components/PlayingCard';
@@ -23,9 +23,6 @@ export const Hand = ({
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
   const isFirstRender = useRef(true);
 
-  // Mantenimento intelligente del focus:
-  // "Attenzione ai momenti critici: quando le carte giocate spariscono o arrivano quelle nuove,
-  // il focus deve finire in un punto sensato" (Slide 8 delle specifiche)
   useEffect(() => {
     if (isFirstRender.current) {
       isFirstRender.current = false;
@@ -43,7 +40,6 @@ export const Hand = ({
     }
   }, [hand]);
 
-  // Gestione tastiera per le carte in mano
   const handleKeyDown = (e: React.KeyboardEvent, index: number, card: Card) => {
     if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
       e.preventDefault();
