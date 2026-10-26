@@ -13,7 +13,7 @@ import {
 } from './logic';
 
 const ROUND_TARGETS = [300, 600, 1000];
-const STORAGE_KEY = 'balatro_accessible_game_state_v2';
+const STORAGE_KEY = 'stellaris_accessible_game_state_v1';
 
 export type GameStatus = 'playing' | 'round_won' | 'shop' | 'game_won' | 'game_over';
 
@@ -44,7 +44,7 @@ export const useGame = () => {
 
   // Annuncio per screen reader (aria-live polite)
   const [announcement, setAnnouncement] = useState<string>(
-    'Benvenuto a AstroBalatro! Inizia la partita. Round 1: Obiettivo 300 punti. 8 carte in mano.'
+    'Benvenuto a Stellaris! Inizia la partita. Round 1: Obiettivo 300 punti. 8 carte in mano.'
   );
 
   const targetScore = ROUND_TARGETS[currentRound - 1] || 1000;

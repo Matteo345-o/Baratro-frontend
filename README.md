@@ -1,4 +1,4 @@
-# AstroBalatro - Un Balatro Accessibile
+# Stellaris - Un Balatro Accessibile
 
 Gioco di carte roguelike accessibile a tema spaziale, sviluppato per l'esercitazione ITS di sviluppo web assistito con AI.
 
@@ -7,7 +7,7 @@ Gioco di carte roguelike accessibile a tema spaziale, sviluppato per l'esercitaz
 ## 1. Blocco di contesto usato con l'AI
 
 ```markdown
-# AstroBalatro
+# Stellaris
 ## Stack
 - React 19 + Vite 6
 - TypeScript 5.7

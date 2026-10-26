@@ -1,4 +1,4 @@
-# AstroBalatro
+# Stellaris
 ## Stack
 - React 19 + Vite 6
 - TypeScript 5.7

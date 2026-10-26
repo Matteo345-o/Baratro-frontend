@@ -1,7 +1,7 @@
 {
-  "name": "AstroBalatro - Balatro Accessibile",
-  "short_name": "AstroBalatro",
-  "description": "Un gioco di carte roguelike accessibile, giocabile solo da tastiera e a tema spaziale",
+  "name": "Stellaris - Balatro Accessibile",
+  "short_name": "Stellaris",
+  "description": "Stellaris: un gioco di carte roguelike accessibile, giocabile solo da tastiera e a tema spaziale",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0b0c10",

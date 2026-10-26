@@ -105,7 +105,7 @@ export const App = () => {
       >
         <div>
           <h1 style={{ fontSize: '24px', color: '#66fcf1', margin: 0 }}>
-            🪐 AstroBalatro
+            🪐 Stellaris
           </h1>
           <p style={{ margin: '4px 0 0', fontSize: '14px', color: '#c5c6c7' }}>
             Un Balatro accessibile a tema spaziale con carte da poker e Jolly
@@ -279,7 +279,7 @@ export const App = () => {
         <div style={{ background: '#0d3b2e', border: '2px solid #ffd166', padding: '24px', borderRadius: '10px', margin: '12px 0', textAlign: 'center' }}>
           <h2 style={{ color: '#ffd166', marginBottom: '8px', fontSize: '26px' }}>🏆 VITTORIA FINALE!</h2>
           <p style={{ marginBottom: '16px', fontSize: '16px' }}>
-            Congratulazioni, Comandante! Hai completato con successo tutti e 3 i round dell'AstroBalatro!
+            Congratulazioni, Comandante! Hai completato con successo tutti e 3 i round di Stellaris!
           </p>
           <button className="btn btn-primary" onClick={resetGame} autoFocus>
             Gioca un'altra partita

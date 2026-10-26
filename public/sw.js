@@ -1,5 +1,5 @@
 // public/sw.js - Service Worker per PWA Offline
-const CACHE_NAME = 'astrobalatro-cache-v1';
+const CACHE_NAME = 'stellaris-cache-v1';
 
 const STATIC_ASSETS = [
   '/',
