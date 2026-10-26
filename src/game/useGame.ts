@@ -4,16 +4,18 @@ import {
   Card,
   createDeck,
   evaluateHand,
-  calculateScore,
+  calculateScoreWithJokers,
   sortCardsByRank,
   sortCardsBySuit,
-  ComboName,
+  Joker,
+  ALL_JOKERS,
+  ScoreBreakdown,
 } from './logic';
 
 const ROUND_TARGETS = [300, 600, 1000];
-const STORAGE_KEY = 'balatro_accessible_game_state_v1';
+const STORAGE_KEY = 'balatro_accessible_game_state_v2';
 
-export type GameStatus = 'playing' | 'round_won' | 'game_won' | 'game_over';
+export type GameStatus = 'playing' | 'round_won' | 'shop' | 'game_won' | 'game_over';
 
 interface SavedState {
   deck: Card[];
@@ -22,6 +24,8 @@ interface SavedState {
   currentRound: number;
   handsLeft: number;
   discardsLeft: number;
+  money: number;
+  jokers: Joker[];
   status: GameStatus;
 }
 
@@ -33,16 +37,19 @@ export const useGame = () => {
   const [currentRound, setCurrentRound] = useState<number>(1);
   const [handsLeft, setHandsLeft] = useState<number>(4);
   const [discardsLeft, setDiscardsLeft] = useState<number>(3);
+  const [money, setMoney] = useState<number>(4); // Soldi di partenza: $4
+  const [jokers, setJokers] = useState<Joker[]>([]); // Massimo 5 slot per i Jolly
   const [status, setStatus] = useState<GameStatus>('playing');
-  const [lastCombo, setLastCombo] = useState<{ name: ComboName; points: number } | null>(null);
+  const [lastScoreBreakdown, setLastScoreBreakdown] = useState<ScoreBreakdown | null>(null);
 
   // Annuncio per screen reader (aria-live polite)
-  // Requisito slide 9: "Dopo ogni mano un annuncio: combinazione, punti ottenuti, punti mancanti all'obiettivo"
-  const [announcement, setAnnouncement] = useState<string>('Benvenuto! Inizia la partita. Round 1: Obiettivo 300 punti.');
+  const [announcement, setAnnouncement] = useState<string>(
+    'Benvenuto a AstroBalatro! Inizia la partita. Round 1: Obiettivo 300 punti. 8 carte in mano.'
+  );
 
   const targetScore = ROUND_TARGETS[currentRound - 1] || 1000;
 
-  // Inizializza o ripristina la partita salvata (Estensione Salvataggio, slide 6)
+  // Inizializza la partita
   const initGame = useCallback(() => {
     const newDeck = createDeck();
     const initialHand = newDeck.splice(0, 8);
@@ -53,9 +60,11 @@ export const useGame = () => {
     setCurrentRound(1);
     setHandsLeft(4);
     setDiscardsLeft(3);
+    setMoney(4);
+    setJokers([]);
     setStatus('playing');
-    setLastCombo(null);
-    setAnnouncement('Nuova partita iniziata. Round 1 di 3. Obiettivo 300 punti. 8 carte in mano.');
+    setLastScoreBreakdown(null);
+    setAnnouncement('Nuova partita iniziata. Round 1 di 3. Obiettivo 300 punti. $4 nel portafoglio.');
     try {
       localStorage.removeItem(STORAGE_KEY);
     } catch {
@@ -76,8 +85,12 @@ export const useGame = () => {
           setCurrentRound(parsed.currentRound);
           setHandsLeft(parsed.handsLeft);
           setDiscardsLeft(parsed.discardsLeft);
+          setMoney(parsed.money ?? 4);
+          setJokers(parsed.jokers ?? []);
           setStatus(parsed.status);
-          setAnnouncement(`Partita ripresa al Round ${parsed.currentRound}. Punteggio attuale: ${parsed.score} su ${ROUND_TARGETS[parsed.currentRound - 1]}.`);
+          setAnnouncement(
+            `Partita ripresa al Round ${parsed.currentRound}. Punteggio attuale: ${parsed.score} su ${ROUND_TARGETS[parsed.currentRound - 1]}. Soldi: $${parsed.money ?? 4}.`
+          );
           return;
         }
       }
@@ -98,15 +111,17 @@ export const useGame = () => {
         currentRound,
         handsLeft,
         discardsLeft,
+        money,
+        jokers,
         status,
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
     } catch {
       // Ignora errori di storage
     }
-  }, [deck, hand, score, currentRound, handsLeft, discardsLeft, status]);
+  }, [deck, hand, score, currentRound, handsLeft, discardsLeft, money, jokers, status]);
 
-  // Selezione e deselezione delle carte (massimo 5 selezionabili)
+  // Selezione e deselezione delle carte (massimo 5)
   const toggleCardSelection = (card: Card) => {
     if (status !== 'playing') return;
 
@@ -123,14 +138,17 @@ export const useGame = () => {
     });
   };
 
-  // Pesca nuove carte fino a ripristinare 8 carte in mano
-  const drawCards = (cardsToRemove: Card[], currentHand: Card[], currentDeck: Card[]): { newHand: Card[]; newDeck: Card[] } => {
+  // Pesca nuove carte fino a 8 carte in mano
+  const drawCards = (
+    cardsToRemove: Card[],
+    currentHand: Card[],
+    currentDeck: Card[]
+  ): { newHand: Card[]; newDeck: Card[] } => {
     const remainingHand = currentHand.filter((c) => !cardsToRemove.some((r) => r.id === c.id));
     const needed = 8 - remainingHand.length;
 
     let availableDeck = [...currentDeck];
     if (availableDeck.length < needed) {
-      // Se il mazzo finisce, ne ricreiamo uno nuovo mescolato
       availableDeck = [...availableDeck, ...createDeck()];
     }
 
@@ -150,41 +168,45 @@ export const useGame = () => {
     }
 
     const { combo, validCards } = evaluateHand(selectedCards);
-    const pointsGained = calculateScore(combo, validCards);
+    const breakdown = calculateScoreWithJokers(combo, validCards, jokers);
+    const pointsGained = breakdown.finalScore;
     const newScore = score + pointsGained;
     const newHandsLeft = handsLeft - 1;
 
     setScore(newScore);
     setHandsLeft(newHandsLeft);
-    setLastCombo({ name: combo, points: pointsGained });
+    setLastScoreBreakdown(breakdown);
 
     const { newHand, newDeck } = drawCards(selectedCards, hand, deck);
     setHand(newHand);
     setDeck(newDeck);
     setSelectedCards([]);
 
-    // Verifica avanzamento round o vittoria/sconfitta
+    // Verifica superamento round o sconfitta
     if (newScore >= targetScore) {
       if (currentRound >= 3) {
         setStatus('game_won');
         setAnnouncement(
-          `Combinazione: ${combo}! Punti ottenuti: ${pointsGained}. Totale: ${newScore}. VITTORIA FINALE! Hai superato tutti e 3 i round!`
+          `Combinazione: ${combo}! Punti: +${pointsGained}. Totale: ${newScore}. VITTORIA FINALE! Hai superato tutti e 3 i round!`
         );
       } else {
+        // Guadagno denaro: $4 base + $1 per ogni mano rimasta (meccanica Balatro)
+        const earnedMoney = 4 + newHandsLeft;
+        setMoney((m) => m + earnedMoney);
         setStatus('round_won');
         setAnnouncement(
-          `Combinazione: ${combo}! Punti ottenuti: ${pointsGained}. Totale: ${newScore} su ${targetScore}. ROUND ${currentRound} SUPERATO! Premi 'Prossimo Round' per continuare.`
+          `Combinazione: ${combo}! Punti: +${pointsGained}. Totale: ${newScore} su ${targetScore}. Round ${currentRound} superato! Guadagnati $${earnedMoney}. Entra nel Negozio per comprare Jolly.`
         );
       }
     } else if (newHandsLeft <= 0) {
       setStatus('game_over');
       setAnnouncement(
-        `Combinazione: ${combo}! Punti ottenuti: ${pointsGained}. Totale: ${newScore} su ${targetScore}. MANI ESAURITE: Partita persa!`
+        `Combinazione: ${combo}! Punti: +${pointsGained}. Totale: ${newScore} su ${targetScore}. Mani esaurite: Partita persa!`
       );
     } else {
       const remaining = targetScore - newScore;
       setAnnouncement(
-        `Combinazione: ${combo}. Punti ottenuti: ${pointsGained}. Totale: ${newScore}. Mancano ${remaining} punti all'obiettivo. Mani rimaste: ${newHandsLeft}.`
+        `Combinazione: ${combo}. Punti ottenuti: ${pointsGained} (${breakdown.totalChips} fiches × ${breakdown.totalMult} mult). Totale: ${newScore}. Mancano ${remaining} punti. Mani rimaste: ${newHandsLeft}.`
       );
     }
   };
@@ -213,8 +235,46 @@ export const useGame = () => {
     setAnnouncement(`Scartate ${count} carte. Scarti rimanenti: ${newDiscardsLeft}.`);
   };
 
-  // Passaggio al round successivo
-  const nextRound = () => {
+  // Entra nel Negozio tra un round e l'altro
+  const openShop = () => {
+    setStatus('shop');
+    setAnnouncement(`Benvenuto nel Negozio Spaziale! Saldo disponibile: $${money}. Puoi comprare fino a 5 Jolly.`);
+  };
+
+  // Acquista un Jolly dal Negozio
+  const buyJoker = (joker: Joker) => {
+    if (money < joker.cost) {
+      setAnnouncement(`Fondi insufficienti per ${joker.name}. Servono $${joker.cost}, hai $${money}.`);
+      return false;
+    }
+    if (jokers.length >= 5) {
+      setAnnouncement('Slot Jolly pieni! Puoi equipaggiare al massimo 5 Jolly contemporaneamente.');
+      return false;
+    }
+    if (jokers.some((j) => j.id === joker.id)) {
+      setAnnouncement(`Possiedi già il Jolly ${joker.name}.`);
+      return false;
+    }
+
+    setMoney((m) => m - joker.cost);
+    setJokers((prev) => [...prev, joker]);
+    setAnnouncement(`Acquistato ${joker.name} per $${joker.cost}! Saldo residuo: $${money - joker.cost}.`);
+    return true;
+  };
+
+  // Vendi un Jolly equipaggiato
+  const sellJoker = (jokerId: string) => {
+    const joker = jokers.find((j) => j.id === jokerId);
+    if (!joker) return;
+
+    const sellPrice = Math.max(1, Math.floor(joker.cost / 2));
+    setMoney((m) => m + sellPrice);
+    setJokers((prev) => prev.filter((j) => j.id !== jokerId));
+    setAnnouncement(`Venduto ${joker.name} per $${sellPrice}. Nuovo saldo: $${money + sellPrice}.`);
+  };
+
+  // Passaggio al round successivo dal Negozio
+  const startNextRound = () => {
     if (currentRound >= 3) return;
     const nextR = currentRound + 1;
     setCurrentRound(nextR);
@@ -222,7 +282,7 @@ export const useGame = () => {
     setHandsLeft(4);
     setDiscardsLeft(3);
     setStatus('playing');
-    setLastCombo(null);
+    setLastScoreBreakdown(null);
     setSelectedCards([]);
 
     const newDeck = createDeck();
@@ -230,10 +290,12 @@ export const useGame = () => {
     setDeck(newDeck);
     setHand(initialHand);
 
-    setAnnouncement(`Iniziato Round ${nextR}. Obiettivo: ${ROUND_TARGETS[nextR - 1]} punti. 4 mani e 3 scarti disponibili.`);
+    setAnnouncement(
+      `Iniziato Round ${nextR} di 3. Obiettivo: ${ROUND_TARGETS[nextR - 1]} punti. 4 mani e 3 scarti disponibili. Jolly attivi: ${jokers.length}.`
+    );
   };
 
-  // Estensione Ordinamento: ordina per valore (rank) o per seme (suit)
+  // Ordinamento: per valore o per seme
   const sortHand = (by: 'rank' | 'suit') => {
     if (by === 'rank') {
       setHand(sortCardsByRank(hand));
@@ -252,14 +314,20 @@ export const useGame = () => {
     currentRound,
     handsLeft,
     discardsLeft,
+    money,
+    jokers,
+    allShopJokers: ALL_JOKERS,
     status,
-    lastCombo,
+    lastScoreBreakdown,
     announcement,
     toggleCardSelection,
     playHand,
     discardCards,
     sortHand,
-    nextRound,
+    openShop,
+    buyJoker,
+    sellJoker,
+    startNextRound,
     resetGame: initGame,
   };
 };

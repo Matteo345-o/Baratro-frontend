@@ -15,9 +15,12 @@ Gioco di carte roguelike accessibile a tema spaziale, sviluppato per l'esercitaz
 - Pubblicazione su Vercel
 ## Gioco
 - Gioco di carte a turni accessibile ispirato a Balatro a tema spaziale (Pianeti, Stelle, Comete, Galassie)
+- Carte stile poker (indici specchiati a 180°, figure J/Q/K/A e pips numerati su sfondo bianco ad alto contrasto)
 - Logica di gioco in src/game/, separata dai componenti React
 - 3 round con punteggi target: 300, 600, 1000 punti
 - 4 mani e 3 scarti per round
+- Estensioni: 5 Jolly speciali, Negozio inter-round con acquisto/vendita, Salvataggio localStorage, Ordinamento per valore e per seme
+- PWA installabile con supporto offline (Service Worker + Manifest)
 ## Regole
 - Tutto giocabile da tastiera, focus sempre visibile e mai perso dopo le azioni
 - Pattern ARIA secondo le WAI-ARIA Authoring Practices (Listbox con roving tabindex, dialoghi per aiuto, live regions per annunci)
@@ -27,16 +30,56 @@ Gioco di carte roguelike accessibile a tema spaziale, sviluppato per l'esercitaz
 
 ---
 
-## 2. Librerie scelte e motivazione
+## 2. Design delle Carte Poker-Style
 
-- **React 19 & React-DOM 19**: Standard moderno per la gestione dichiarativa dell'interfaccia a componenti e dello stato reattivo.
-- **Vite 6**: Bundler ultra-rapido con supporto nativo ES Modules, ricaricamento a caldo (HMR) e build ottimizzata per Vercel.
-- **TypeScript 5.7**: Tipizzazione statica per garantire l'integrità del modello dati delle carte, dei ranghi, semi e calcolo punteggi senza bug a runtime.
-- **Nessuna libreria UI o CSS esterna**: Tutto lo stile è in CSS puro con token accessibili (colori ad alto contrasto, min-touch target di 44px, reset overflow per 360px), senza dipendenze pesanti o superflue.
+Le carte sono state progettate per riprodurre fedelmente l'anatomia di un vero mazzo di carte da poker:
+- **Corpo e Sfondo**: Sfondo bianco classico `#ffffff` con texture telata, angoli arrotondati e bordi nitidi.
+- **Indici Angolari**: Valore (rank) e simbolo del seme sia nell'angolo in alto a sinistra sia nell'angolo in basso a destra (ruotato a 180° come nelle carte autentiche).
+- **Figure Reali (J, Q, K, A)**:
+  - **A (Asso)**: Emblema monumentale centrale con lettering ASSO.
+  - **K (Re)**: Corona maestosa 👑 con sigillo RE.
+  - **Q (Regina)**: Corona reale 👸 con sigillo REGINA.
+  - **J (Fante)**: Spada e scudo d'onore ⚔️ con sigillo FANTE.
+- **Carte Numerate (2-10)**: Disposizione geometrica a *pips* (semi ripetuti) proporzionata al valore numerico.
+- **Colori dei Semi e Accessibilità**:
+  - *Stelle*: Rosso Rubino (`#be123c`)
+  - *Pianeti*: Ambra/Bronzo (`#b45309`)
+  - *Comete*: Blu Zaffiro (`#0369a1`)
+  - *Galassie*: Viola/Indaco (`#6b21a8`)
+  Tutti i semi superano il rapporto di contrasto WCAG AAA (> 7:1) su sfondo bianco, e il seme non è mai comunicato solo dal colore ma sempre affiancato da un glifo testuale/emoji e dal nome completo per gli screen reader.
 
 ---
 
-## 3. Fonti consultate sull'accessibilità (A11y)
+## 3. Le 4 Estensioni Obbligatorie Implementate
+
+1. **Jolly (5 carte speciali)**:
+   - *Supernova*: +4 Moltiplicatore su ogni mano.
+   - *Singolarità*: +40 Fiches su ogni mano.
+   - *Telescopio Spaziale*: x2 Moltiplicatore se la mano è Colore, Scala o Scala Colore.
+   - *Pulsar di Stelle*: +15 Fiches per ogni carta di seme Stelle valida nella mano.
+   - *Materia Oscura*: x1.5 Moltiplicatore globale a tutte le mani.
+2. **Negozio (Inter-Round)**:
+   - Al superamento del Round 1 e del Round 2, si apre il Negozio Spaziale.
+   - Il giocatore guadagna crediti ($4 base + $1 per ogni mano rimasta).
+   - È possibile acquistare fino a 5 Jolly o venderli per recuperare crediti.
+3. **Salvataggio persistente**:
+   - Stato salvato automaticamente in `localStorage` ad ogni azione.
+   - Alla chiusura e riapertura del browser, la partita riprende esattamente dal punto interrotto.
+4. **Ordinamento della mano**:
+   - Tasto `V`: ordina per valore decrescente.
+   - Tasto `C`: ordina per seme.
+
+---
+
+## 4. Telefono e PWA (Passo 5)
+
+- **Mobile First**: Layout elastico utilizzabile da 360px di larghezza senza alcuno scroll orizzontale.
+- **Aree toccabili**: Tutti i pulsanti e le carte hanno un'area interattiva di almeno 44×44 px.
+- **Funzionamento Offline**: `public/sw.js` (Service Worker) con cache *stale-while-revalidate* e `public/manifest.webmanifest` per consentire l'installazione su mobile e desktop come app standalone.
+
+---
+
+## 5. Fonti consultate sull'accessibilità (A11y)
 
 1. **W3C WAI-ARIA Authoring Practices Guide (APG)**:
    - Pattern *Listbox* per la selezione multipla delle carte e navigazione orizzontale con Roving Tabindex.
@@ -51,7 +94,7 @@ Gioco di carte roguelike accessibile a tema spaziale, sviluppato per l'esercitaz
 
 ---
 
-## 4. Diario dell'AI: dove ha sbagliato e come ce ne siamo accorti
+## 6. Diario dell'AI: dove ha sbagliato e come ce ne siamo accorti
 
 Come previsto dal metodo di lavoro con l'AI e dalla lezione sul prompt engineering, analizzare e correggere le allucinazioni o gli errori dell'AI è fondamentale:
 
@@ -68,16 +111,16 @@ Come previsto dal metodo di lavoro con l'AI e dalla lezione sul prompt engineeri
 3. **Gerarchia WAI-ARIA errata tra Listbox e Option**:
    - *Cosa ha fatto l'AI*: Il contenitore aveva `role="listbox"`, ma conteneva un `div.card-wrapper` generico a cui era associato il focus, mentre `role="option"` e `aria-selected` erano dentro il componente figlio `PlayingCard`.
    - *Come ce ne siamo accorti*: Testando con uno screen reader (NVDA), le carte venivano lette come semplici divisioni senza annunciare il nome o lo stato di selezione.
-   - *Come è stato risolto*: Spostato il ruolo `role="option"`, `aria-selected` e `aria-label` direttamente sull'elemento focabile con tabindex, garantendo che lo screen reader annunci ad esempio: *"Regina di Galassie, valore 10, non selezionata"*.
+   - *Come è stato risolto*: Spostato il ruolo `role="option"`, `aria-selected` e `aria-label` direttamente sull'elemento focabile con tabindex, garantendo che lo screen reader annunci ad esempio: *"Regina di Stelle, valore 10, non selezionata"*.
 
 4. **Combinazioni poker mancanti nella logica**:
-   - *Cosa ha fatto l'AI*: Aveva implementato solo Poker, Full, Tris, Doppia Coppia, Coppia e Carta Alta, commentando che avrebbe aggiunto Scala e Colore in seguito.
-   - *Come ce ne siamo accorti*: Verificando i requisiti della tabella punteggi del documento ITS (Slide 5), dove Scala, Colore e Scala Colore sono obbligatorie.
+   - *Cosa ha fatto l'AI*: Aveva implementato solo Poker, Full, Tris, Doppia Coppia, Coppia e Carta Alta, omettendo Scala, Colore e Scala Colore.
+   - *Come ce ne siamo accorti*: Verificando i requisiti della tabella punteggi del documento ITS (Slide 5), dove tutte le combinazioni sono obbligatorie.
    - *Come è stato risolto*: Aggiunto il riconoscimento di Scala (inclusa scala con Asso basso A-2-3-4-5), Colore e Scala Colore, con calcolo esatto dei punteggi secondo la formula `(fiches combinazione + fiches carte valide) * moltiplicatore`.
 
 ---
 
-## 5. Come avviare il progetto in locale
+## 7. Come avviare il progetto in locale
 
 ```bash
 # Installa le dipendenze

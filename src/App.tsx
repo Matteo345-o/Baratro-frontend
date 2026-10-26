@@ -3,7 +3,8 @@ import { useState, useEffect } from 'react';
 import { useGame } from './game/useGame';
 import { Hand } from './components/Hand';
 import { HelpModal } from './components/HelpModal';
-import { evaluateHand, calculateScore } from './game/logic';
+import { ShopModal } from './components/ShopModal';
+import { evaluateHand, calculateScoreWithJokers } from './game/logic';
 
 export const App = () => {
   const {
@@ -14,30 +15,35 @@ export const App = () => {
     currentRound,
     handsLeft,
     discardsLeft,
+    money,
+    jokers,
+    allShopJokers,
     status,
     announcement,
     toggleCardSelection,
     playHand,
     discardCards,
     sortHand,
-    nextRound,
+    openShop,
+    buyJoker,
+    sellJoker,
+    startNextRound,
     resetGame,
   } = useGame();
 
   const [isHelpOpen, setIsHelpOpen] = useState(false);
 
-  // Calcolo in tempo reale della combinazione per le carte selezionate
+  // Calcolo in tempo reale della combinazione e potenziale punteggio con i Jolly attivi
   const currentEvaluation =
     selectedCards.length > 0 ? evaluateHand(selectedCards) : null;
-  const potentialPoints =
+  const potentialBreakdown =
     currentEvaluation && currentEvaluation.validCards.length > 0
-      ? calculateScore(currentEvaluation.combo, currentEvaluation.validCards)
-      : 0;
+      ? calculateScoreWithJokers(currentEvaluation.combo, currentEvaluation.validCards, jokers)
+      : null;
 
   // Scorciatoie globali da tastiera (?, v, c, j, s)
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      // Ignora se siamo dentro un input o se la modale è aperta
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
         return;
       }
@@ -45,18 +51,18 @@ export const App = () => {
       if (e.key === '?' || (e.key === '/' && e.shiftKey)) {
         e.preventDefault();
         setIsHelpOpen((prev) => !prev);
-      } else if (e.key.toLowerCase() === 'v' && !isHelpOpen) {
+      } else if (e.key.toLowerCase() === 'v' && !isHelpOpen && status === 'playing') {
         e.preventDefault();
         sortHand('rank');
-      } else if (e.key.toLowerCase() === 'c' && !isHelpOpen) {
+      } else if (e.key.toLowerCase() === 'c' && !isHelpOpen && status === 'playing') {
         e.preventDefault();
         sortHand('suit');
-      } else if (e.key.toLowerCase() === 'j' && !isHelpOpen) {
+      } else if (e.key.toLowerCase() === 'j' && !isHelpOpen && status === 'playing') {
         if (selectedCards.length >= 1 && selectedCards.length <= 5 && handsLeft > 0) {
           e.preventDefault();
           playHand();
         }
-      } else if (e.key.toLowerCase() === 's' && !isHelpOpen) {
+      } else if (e.key.toLowerCase() === 's' && !isHelpOpen && status === 'playing') {
         if (selectedCards.length >= 1 && selectedCards.length <= 5 && discardsLeft > 0) {
           e.preventDefault();
           discardCards();
@@ -66,12 +72,12 @@ export const App = () => {
 
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [isHelpOpen, selectedCards, handsLeft, discardsLeft, playHand, discardCards, sortHand]);
+  }, [isHelpOpen, status, selectedCards, handsLeft, discardsLeft, playHand, discardCards, sortHand]);
 
   return (
     <main
       style={{
-        maxWidth: '900px',
+        maxWidth: '920px',
         margin: '0 auto',
         padding: '16px',
         minHeight: '100vh',
@@ -102,11 +108,25 @@ export const App = () => {
             🪐 AstroBalatro
           </h1>
           <p style={{ margin: '4px 0 0', fontSize: '14px', color: '#c5c6c7' }}>
-            Un Balatro accessibile a tema spaziale
+            Un Balatro accessibile a tema spaziale con carte da poker e Jolly
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <div
+            style={{
+              background: '#161b22',
+              border: '1px solid #ffd166',
+              padding: '6px 12px',
+              borderRadius: '8px',
+              color: '#ffd166',
+              fontWeight: 800,
+              fontSize: '15px',
+            }}
+          >
+            💰 ${money}
+          </div>
+
           <button
             onClick={() => setIsHelpOpen(true)}
             aria-label="Apri guida scorciatoie tastiera"
@@ -123,6 +143,57 @@ export const App = () => {
         </div>
       </header>
 
+      {/* Sezione Jolly Attivi del Giocatore */}
+      <section
+        aria-label="Jolly attualmente equipaggiati"
+        style={{
+          margin: '12px 0 4px',
+          padding: '8px 12px',
+          background: '#161b22',
+          border: '1px solid #30363d',
+          borderRadius: '8px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '8px',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <strong style={{ fontSize: '13px', color: '#66fcf1', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            Jolly Attivi ({jokers.length}/5):
+          </strong>
+          {jokers.length === 0 ? (
+            <span style={{ fontSize: '13px', color: '#8b949e' }}>
+              Nessun Jolly equipaggiato (comprali nel Negozio tra i round)
+            </span>
+          ) : (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+              {jokers.map((j) => (
+                <span
+                  key={j.id}
+                  title={`${j.name}: ${j.description}`}
+                  style={{
+                    background: '#21262d',
+                    border: '1px solid #45a29e',
+                    padding: '3px 8px',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    color: '#ffffff',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  {j.icon} {j.name}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
       {/* Pannello Stato Partita (Punti, Round, Mani, Scarti) */}
       <section
         aria-label="Informazioni della partita in corso"
@@ -130,7 +201,7 @@ export const App = () => {
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
           gap: '12px',
-          margin: '16px 0',
+          margin: '12px 0',
         }}
       >
         <div style={{ background: '#1f2833', padding: '12px', borderRadius: '8px', border: '1px solid #45a29e', textAlign: 'center' }}>
@@ -170,28 +241,46 @@ export const App = () => {
           borderLeft: '4px solid #66fcf1',
           padding: '10px 16px',
           borderRadius: '4px',
-          margin: '8px 0',
+          margin: '6px 0 12px',
           fontSize: '15px',
         }}
       >
         📢 {announcement}
       </div>
 
+      {/* SCHERMATA DEL NEGOZIO (ESTENSIONE OBBLIGATORIA SLIDE 6) */}
+      {status === 'shop' && (
+        <ShopModal
+          money={money}
+          equippedJokers={jokers}
+          availableJokers={allShopJokers}
+          onBuyJoker={buyJoker}
+          onSellJoker={sellJoker}
+          onStartNextRound={startNextRound}
+          nextRoundNumber={currentRound + 1}
+          nextRoundTarget={currentRound === 1 ? 600 : 1000}
+        />
+      )}
+
       {/* Notifiche di Vittoria Round o Fine Partita */}
       {status === 'round_won' && (
-        <div style={{ background: '#0d3b2e', border: '2px solid #06d6a0', padding: '16px', borderRadius: '8px', margin: '12px 0', textAlign: 'center' }}>
-          <h2 style={{ color: '#06d6a0', marginBottom: '8px' }}>🎉 Obiettivo Round Raggiunto!</h2>
-          <p style={{ marginBottom: '12px' }}>Hai superato l'obiettivo di {targetScore} punti.</p>
-          <button className="btn btn-primary" onClick={nextRound} autoFocus>
-            Passa al Prossimo Round ➔
+        <div style={{ background: '#0d3b2e', border: '2px solid #06d6a0', padding: '18px', borderRadius: '10px', margin: '12px 0', textAlign: 'center' }}>
+          <h2 style={{ color: '#06d6a0', marginBottom: '8px' }}>🎉 Obiettivo Round {currentRound} Raggiunto!</h2>
+          <p style={{ marginBottom: '14px', fontSize: '15px' }}>
+            Hai superato l'obiettivo di {targetScore} punti e guadagnato crediti bonus!
+          </p>
+          <button className="btn btn-primary" onClick={openShop} autoFocus style={{ fontSize: '16px', padding: '12px 24px' }}>
+            🛒 Entra nel Negozio Spaziale ➔
           </button>
         </div>
       )}
 
       {status === 'game_won' && (
-        <div style={{ background: '#0d3b2e', border: '2px solid #ffd166', padding: '20px', borderRadius: '8px', margin: '12px 0', textAlign: 'center' }}>
-          <h2 style={{ color: '#ffd166', marginBottom: '8px' }}>🏆 VITTORIA FINALE!</h2>
-          <p style={{ marginBottom: '16px' }}>Congratulazioni, hai completato con successo tutti e 3 i round!</p>
+        <div style={{ background: '#0d3b2e', border: '2px solid #ffd166', padding: '24px', borderRadius: '10px', margin: '12px 0', textAlign: 'center' }}>
+          <h2 style={{ color: '#ffd166', marginBottom: '8px', fontSize: '26px' }}>🏆 VITTORIA FINALE!</h2>
+          <p style={{ marginBottom: '16px', fontSize: '16px' }}>
+            Congratulazioni, Comandante! Hai completato con successo tutti e 3 i round dell'AstroBalatro!
+          </p>
           <button className="btn btn-primary" onClick={resetGame} autoFocus>
             Gioca un'altra partita
           </button>
@@ -199,112 +288,128 @@ export const App = () => {
       )}
 
       {status === 'game_over' && (
-        <div style={{ background: '#3d1419', border: '2px solid #ef476f', padding: '20px', borderRadius: '8px', margin: '12px 0', textAlign: 'center' }}>
-          <h2 style={{ color: '#ef476f', marginBottom: '8px' }}>💀 Partita Persa!</h2>
-          <p style={{ marginBottom: '16px' }}>Hai esaurito le mani prima di raggiungere {targetScore} punti.</p>
+        <div style={{ background: '#3d1419', border: '2px solid #ef476f', padding: '24px', borderRadius: '10px', margin: '12px 0', textAlign: 'center' }}>
+          <h2 style={{ color: '#ef476f', marginBottom: '8px', fontSize: '24px' }}>💀 Partita Persa!</h2>
+          <p style={{ marginBottom: '16px', fontSize: '15px' }}>
+            Hai esaurito le 4 mani prima di raggiungere i {targetScore} punti richiesti.
+          </p>
           <button className="btn btn-danger" onClick={resetGame} autoFocus>
             Riprova (Nuova Partita)
           </button>
         </div>
       )}
 
-      {/* Anteprima combinazione corrente */}
-      <div
-        style={{
-          minHeight: '44px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '12px',
-          margin: '8px 0',
-          padding: '8px',
-          background: selectedCards.length > 0 ? '#1f2833' : 'transparent',
-          borderRadius: '8px',
-          border: selectedCards.length > 0 ? '1px dashed #66fcf1' : 'none',
-        }}
-      >
-        {currentEvaluation ? (
-          <span style={{ fontSize: '16px' }}>
-            Combinazione:{' '}
-            <strong style={{ color: '#66fcf1' }}>{currentEvaluation.combo}</strong>{' '}
-            (Punti stimati:{' '}
-            <strong style={{ color: '#06d6a0' }}>+{potentialPoints}</strong>)
-          </span>
-        ) : (
-          <span style={{ color: '#888', fontSize: '14px' }}>
-            Usa le frecce e lo Spazio per selezionare da 1 a 5 carte
-          </span>
-        )}
-      </div>
+      {/* Anteprima combinazione corrente con calcolo Fiches e Moltiplicatore */}
+      {status === 'playing' && (
+        <div
+          style={{
+            minHeight: '48px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '12px',
+            margin: '8px 0',
+            padding: '10px 16px',
+            background: selectedCards.length > 0 ? '#1f2833' : 'rgba(255,255,255,0.02)',
+            borderRadius: '8px',
+            border: selectedCards.length > 0 ? '1px dashed #66fcf1' : '1px solid #30363d',
+            flexWrap: 'wrap',
+          }}
+        >
+          {potentialBreakdown && currentEvaluation ? (
+            <div style={{ fontSize: '15px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <span>
+                Combinazione: <strong style={{ color: '#66fcf1', fontSize: '17px' }}>{currentEvaluation.combo}</strong>
+              </span>
+              <span style={{ color: '#8b949e' }}>|</span>
+              <span>
+                Fiches: <strong style={{ color: '#38bdf8' }}>{potentialBreakdown.totalChips}</strong>
+              </span>
+              <span style={{ color: '#8b949e' }}>×</span>
+              <span>
+                Mult: <strong style={{ color: '#f43f5e' }}>{potentialBreakdown.totalMult * potentialBreakdown.xMult}</strong>
+              </span>
+              <span style={{ color: '#8b949e' }}>=</span>
+              <span>
+                Punti Stimati: <strong style={{ color: '#06d6a0', fontSize: '18px' }}>+{potentialBreakdown.finalScore}</strong>
+              </span>
+            </div>
+          ) : (
+            <span style={{ color: '#8b949e', fontSize: '14px' }}>
+              Usa le frecce per muoverti e lo <strong>Spazio</strong> per selezionare da 1 a 5 carte
+            </span>
+          )}
+        </div>
+      )}
 
-      {/* Area Carte in mano */}
-      <section aria-label="Mano di carte del giocatore">
-        <Hand
-          hand={hand}
-          selectedCards={selectedCards}
-          onToggleCard={toggleCardSelection}
-          onPlay={playHand}
-          onDiscard={discardCards}
-        />
-      </section>
+      {/* Area Carte in mano da Poker (Solo quando in gioco) */}
+      {status === 'playing' && (
+        <section aria-label="Mano di carte del giocatore">
+          <Hand
+            hand={hand}
+            selectedCards={selectedCards}
+            onToggleCard={toggleCardSelection}
+            onPlay={playHand}
+            onDiscard={discardCards}
+          />
+        </section>
+      )}
 
       {/* Pulsanti Azioni e Ordinamento (Requisito slide 6 & 10: bottoni con min 44x44px) */}
-      <footer
-        style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          justifyContent: 'center',
-          alignItems: 'center',
-          gap: '12px',
-          marginTop: '16px',
-          paddingTop: '16px',
-          borderTop: '2px solid #1f2833',
-        }}
-      >
-        <button
-          className="btn btn-primary"
-          onClick={playHand}
-          disabled={
-            selectedCards.length === 0 ||
-            selectedCards.length > 5 ||
-            handsLeft <= 0 ||
-            status !== 'playing'
-          }
-          aria-label="Gioca le carte selezionate (scorciatoia: tasto J)"
+      {status === 'playing' && (
+        <footer
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            justifyContent: 'center',
+            alignItems: 'center',
+            gap: '12px',
+            marginTop: '16px',
+            paddingTop: '16px',
+            borderTop: '2px solid #1f2833',
+          }}
         >
-          🃏 Gioca Mano (J) {selectedCards.length > 0 && `(${selectedCards.length})`}
-        </button>
+          <button
+            className="btn btn-primary"
+            onClick={playHand}
+            disabled={
+              selectedCards.length === 0 ||
+              selectedCards.length > 5 ||
+              handsLeft <= 0
+            }
+            aria-label="Gioca le carte selezionate (scorciatoia: tasto J)"
+          >
+            🃏 Gioca Mano (J) {selectedCards.length > 0 && `(${selectedCards.length})`}
+          </button>
 
-        <button
-          className="btn btn-danger"
-          onClick={discardCards}
-          disabled={
-            selectedCards.length === 0 ||
-            selectedCards.length > 5 ||
-            discardsLeft <= 0 ||
-            status !== 'playing'
-          }
-          aria-label="Scarta le carte selezionate (scorciatoia: tasto S)"
-        >
-          🗑️ Scarta (S) {selectedCards.length > 0 && `(${selectedCards.length})`}
-        </button>
+          <button
+            className="btn btn-danger"
+            onClick={discardCards}
+            disabled={
+              selectedCards.length === 0 ||
+              selectedCards.length > 5 ||
+              discardsLeft <= 0
+            }
+            aria-label="Scarta le carte selezionate (scorciatoia: tasto S)"
+          >
+            🗑️ Scarta (S) {selectedCards.length > 0 && `(${selectedCards.length})`}
+          </button>
 
-        <button
-          onClick={() => sortHand('rank')}
-          disabled={status !== 'playing'}
-          aria-label="Ordina le carte per valore decrescente (scorciatoia: tasto V)"
-        >
-          🔢 Ordina Valore (V)
-        </button>
+          <button
+            onClick={() => sortHand('rank')}
+            aria-label="Ordina le carte per valore decrescente (scorciatoia: tasto V)"
+          >
+            🔢 Ordina Valore (V)
+          </button>
 
-        <button
-          onClick={() => sortHand('suit')}
-          disabled={status !== 'playing'}
-          aria-label="Ordina le carte per seme (scorciatoia: tasto C)"
-        >
-          🪐 Ordina Seme (C)
-        </button>
-      </footer>
+          <button
+            onClick={() => sortHand('suit')}
+            aria-label="Ordina le carte per seme (scorciatoia: tasto C)"
+          >
+            🪐 Ordina Seme (C)
+          </button>
+        </footer>
+      )}
 
       {/* Modale Aiuto con scorciatoie tastiera (WAI-ARIA Dialog) */}
       <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />

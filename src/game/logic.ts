@@ -206,6 +206,125 @@ export const calculateScore = (combo: ComboName, validCards: Card[]): number => 
   return (chips + cardsValue) * mult;
 };
 
+// ==========================================
+// ESTENSIONE: JOLLY (Carte speciali punteggio)
+// ==========================================
+export interface Joker {
+  id: string;
+  name: string;
+  description: string;
+  cost: number;
+  icon: string;
+  rarity: 'Comune' | 'Raro' | 'Leggendario';
+  effect: (context: {
+    combo: ComboName;
+    validCards: Card[];
+  }) => { extraChips: number; extraMult: number; xMult: number };
+}
+
+// 5 Carte Jolly tematiche spaziali (Requisito slide 6: da 3 a 5 carte speciali)
+export const ALL_JOKERS: Joker[] = [
+  {
+    id: 'supernova',
+    name: 'Supernova',
+    description: '+4 Moltiplicatore su ogni mano',
+    cost: 4,
+    icon: '💥',
+    rarity: 'Comune',
+    effect: () => ({ extraChips: 0, extraMult: 4, xMult: 1 }),
+  },
+  {
+    id: 'singularity',
+    name: 'Singolarità',
+    description: '+40 Fiches su ogni mano',
+    cost: 4,
+    icon: '🕳️',
+    rarity: 'Comune',
+    effect: () => ({ extraChips: 40, extraMult: 0, xMult: 1 }),
+  },
+  {
+    id: 'telescope',
+    name: 'Telescopio Spaziale',
+    description: 'x2 Molt se la mano è Colore o Scala',
+    cost: 6,
+    icon: '🔭',
+    rarity: 'Raro',
+    effect: ({ combo }) => {
+      const ok = ['Colore', 'Scala', 'Scala colore'].includes(combo);
+      return { extraChips: 0, extraMult: 0, xMult: ok ? 2 : 1 };
+    },
+  },
+  {
+    id: 'pulsar',
+    name: 'Pulsar di Stelle',
+    description: '+15 Fiches per ogni carta di seme Stelle giocata',
+    cost: 5,
+    icon: '⭐',
+    rarity: 'Comune',
+    effect: ({ validCards }) => {
+      const starCount = validCards.filter((c) => c.suit === 'Stelle').length;
+      return { extraChips: starCount * 15, extraMult: 0, xMult: 1 };
+    },
+  },
+  {
+    id: 'darkmatter',
+    name: 'Materia Oscura',
+    description: 'x1.5 Moltiplicatore totale a ogni mano',
+    cost: 7,
+    icon: '🌌',
+    rarity: 'Leggendario',
+    effect: () => ({ extraChips: 0, extraMult: 0, xMult: 1.5 }),
+  },
+];
+
+export interface ScoreBreakdown {
+  baseChips: number;
+  cardsChips: number;
+  jokerChips: number;
+  totalChips: number;
+  baseMult: number;
+  jokerMult: number;
+  totalMult: number;
+  xMult: number;
+  finalScore: number;
+}
+
+export const calculateScoreWithJokers = (
+  combo: ComboName,
+  validCards: Card[],
+  jokers: Joker[] = []
+): ScoreBreakdown => {
+  const { chips: baseChips, mult: baseMult } = SCORE_TABLE[combo];
+  const cardsChips = validCards.reduce((sum, card) => sum + card.value, 0);
+
+  let jokerChips = 0;
+  let jokerMult = 0;
+  let xMult = 1;
+
+  for (const joker of jokers) {
+    const bonus = joker.effect({ combo, validCards });
+    jokerChips += bonus.extraChips;
+    jokerMult += bonus.extraMult;
+    xMult *= bonus.xMult;
+  }
+
+  const totalChips = baseChips + cardsChips + jokerChips;
+  const totalMult = baseMult + jokerMult;
+  const finalScore = Math.floor(totalChips * totalMult * xMult);
+
+  return {
+    baseChips,
+    cardsChips,
+    jokerChips,
+    totalChips,
+    baseMult,
+    jokerMult,
+    totalMult,
+    xMult,
+    finalScore,
+  };
+};
+
 // Funzioni per l'estensione Ordinamento
 export const sortCardsByRank = (cards: Card[]): Card[] => {
   return [...cards].sort((a, b) => RANK_ORDER[b.rank] - RANK_ORDER[a.rank]);
