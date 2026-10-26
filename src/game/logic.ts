@@ -1,6 +1,6 @@
 // src/game/logic.ts
 
-export type Suit = 'Pianeti' | 'Stelle' | 'Comete' | 'Galassie';
+export type Suit = 'Cuori' | 'Quadri' | 'Fiori' | 'Picche';
 export type Rank = '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | 'J' | 'Q' | 'K' | 'A';
 
 export interface Card {
@@ -51,17 +51,17 @@ export const RANK_NAMES: Record<Rank, string> = {
   'A': 'Asso',
 };
 
-// Simboli associati ai semi (non basati solo sul colore per accessibilità WCAG)
+// Simboli del mazzo francese classico (Poker)
 export const SUIT_SYMBOLS: Record<Suit, string> = {
-  Pianeti: '🪐',
-  Stelle: '⭐',
-  Comete: '☄️',
-  Galassie: '🌌',
+  Cuori: '♥',
+  Quadri: '♦',
+  Fiori: '♣',
+  Picche: '♠',
 };
 
-// 2. Creazione e mescolamento del mazzo da 52 carte
+// 2. Creazione e mescolamento del mazzo da 52 carte francese
 export const createDeck = (): Card[] => {
-  const suits: Suit[] = ['Pianeti', 'Stelle', 'Comete', 'Galassie'];
+  const suits: Suit[] = ['Cuori', 'Quadri', 'Fiori', 'Picche'];
   const ranks: Rank[] = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
   const deck: Card[] = [];
 
@@ -256,14 +256,14 @@ export const ALL_JOKERS: Joker[] = [
   },
   {
     id: 'pulsar',
-    name: 'Pulsar di Stelle',
-    description: '+15 Fiches per ogni carta di seme Stelle giocata',
+    name: 'Pulsar di Cuori',
+    description: '+15 Fiches per ogni carta di seme Cuori giocata',
     cost: 5,
-    icon: '⭐',
+    icon: '♥',
     rarity: 'Comune',
     effect: ({ validCards }) => {
-      const starCount = validCards.filter((c) => c.suit === 'Stelle').length;
-      return { extraChips: starCount * 15, extraMult: 0, xMult: 1 };
+      const heartCount = validCards.filter((c) => c.suit === 'Cuori').length;
+      return { extraChips: heartCount * 15, extraMult: 0, xMult: 1 };
     },
   },
   {
@@ -332,10 +332,10 @@ export const sortCardsByRank = (cards: Card[]): Card[] => {
 
 export const sortCardsBySuit = (cards: Card[]): Card[] => {
   const suitOrder: Record<Suit, number> = {
-    Pianeti: 1,
-    Stelle: 2,
-    Comete: 3,
-    Galassie: 4,
+    Picche: 1,
+    Cuori: 2,
+    Fiori: 3,
+    Quadri: 4,
   };
   return [...cards].sort((a, b) => {
     if (suitOrder[a.suit] !== suitOrder[b.suit]) {
