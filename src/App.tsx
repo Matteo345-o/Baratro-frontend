@@ -406,7 +406,7 @@ export const App = () => {
             onClick={() => sortHand('suit')}
             aria-label="Ordina le carte per seme (scorciatoia: tasto C)"
           >
-            ♠️ Ordina Seme (C)
+            🪐 Ordina Seme (C)
           </button>
         </footer>
       )}
